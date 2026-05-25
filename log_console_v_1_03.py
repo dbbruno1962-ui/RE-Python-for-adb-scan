@@ -393,19 +393,22 @@ class MainWindow(QWidget):
         self.thread = None
 
     def append_log(self, line, proto):
-        color = "#FFFFFF"
+        # Nuova palette a contrasto alto
+        color = "#AAAAAA"  # default: grigio chiaro
+
         if proto == "BLE":
-            color = "#00FFFF"
+            color = "#00BFFF"   # DeepSkyBlue
         elif proto == "PAIR":
-            color = "#00FF88"
+            color = "#228B22"   # ForestGreen
         elif proto == "TLS":
-            color = "#FFD700"
+            color = "#FF4500"   # OrangeRed
         elif proto == "UDP":
-            color = "#FFAA00"
+            color = "#6A5ACD"   # SlateBlue
         elif proto == "TUTK":
-            color = "#FF66FF"
+            color = "#FF1493"   # DeepPink
         elif proto == "UI":
-            color = "#66AAFF"
+            color = "#3333FF"   # strong blue
+
         self.log_view.append(
             f'<span style="color:{color}">{line}</span>'
         )
