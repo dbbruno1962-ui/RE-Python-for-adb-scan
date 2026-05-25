@@ -101,6 +101,15 @@ def adb_command(cmd):
     except Exception:
         return ""
 
+# --- funzione per restart ADB ---
+def adb_restart():
+    try:
+        subprocess.run(["./adb.exe", "kill-server"])
+        subprocess.run(["./adb.exe", "start-server"])
+        print("ADB riavviato con successo.")
+    except Exception as e:
+        print(f"Errore nel riavvio di ADB: {e}")
+
 class LogcatThread(QThread):
     new_line = Signal(str, str)
     status = Signal(str)
@@ -248,26 +257,26 @@ class MainWindow(QWidget):
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
         self.reload_btn = QPushButton("RELOAD FILTERS")
+        self.restart_adb_btn = QPushButton("RESTART ADB")  # nuovo bottone
         self.status_label = QLabel("Idle")
+
         top.addWidget(self.search_box)
         top.addWidget(self.scan_btn)
         top.addWidget(self.start_btn)
         top.addWidget(self.stop_btn)
         top.addWidget(self.reload_btn)
+        top.addWidget(self.restart_adb_btn)
         top.addWidget(self.status_label)
         root.addLayout(top)
 
-        # CENTER
+        # CENTRO (resto UI invariato)
         center = QHBoxLayout()
-        # APP LIST
         self.app_list = QListWidget()
         self.app_list.setMinimumWidth(260)
         center.addWidget(self.app_list, 1)
-        # LOG VIEW
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
         center.addWidget(self.log_view, 5)
-        # RIGHT PANEL
         right = QVBoxLayout()
         right.addWidget(QLabel("PATTERNS"))
         self.pattern_list = QListWidget()
@@ -275,8 +284,6 @@ class MainWindow(QWidget):
         right.addWidget(QLabel("ACTIVE FILTERS"))
         self.filter_list = QListWidget()
         right.addWidget(self.filter_list)
-
-        # STATS
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         right.addWidget(line)
@@ -293,10 +300,8 @@ class MainWindow(QWidget):
         center.addLayout(right, 1)
         root.addLayout(center)
         self.setLayout(root)
-
-        # LOAD FILTERS
+        # PANELLO FILTRI
         self.populate_filter_panel()
-
         # SIGNALS
         self.scan_btn.clicked.connect(self.scan_apps)
         self.start_btn.clicked.connect(self.start_capture)
@@ -304,6 +309,12 @@ class MainWindow(QWidget):
         self.reload_btn.clicked.connect(self.reload_filters)
         self.pattern_list.itemDoubleClicked.connect(self.add_pattern_to_filters)
         self.search_box.textChanged.connect(self.filter_app_list)
+        self.restart_adb_btn.clicked.connect(self.handle_restart_adb)  # collegamento bottone
+
+    def handle_restart_adb(self):
+        self.status_label.setText("Riavvio ADB in corso...")
+        adb_restart()
+        self.status_label.setText("ADB riavviato")
 
     def populate_filter_panel(self):
         self.filter_list.clear()
@@ -393,9 +404,7 @@ class MainWindow(QWidget):
         self.thread = None
 
     def append_log(self, line, proto):
-        # Nuova palette a contrasto alto
         color = "#AAAAAA"  # default: grigio chiaro
-
         if proto == "BLE":
             color = "#00BFFF"   # DeepSkyBlue
         elif proto == "PAIR":
@@ -408,7 +417,6 @@ class MainWindow(QWidget):
             color = "#FF1493"   # DeepPink
         elif proto == "UI":
             color = "#3333FF"   # strong blue
-
         self.log_view.append(
             f'<span style="color:{color}">{line}</span>'
         )
