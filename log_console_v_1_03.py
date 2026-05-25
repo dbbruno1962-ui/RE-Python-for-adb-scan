@@ -16,39 +16,38 @@
 # Requirements:
 # pip install PySide6
 
-# adb.exe must stay in the SAME folder.
-
 import os
 import re
-import sys
-import time
+import shutil
 import subprocess
+import sys
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor
+from PySide6.QtGui import QColor, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
-    QWidget,
-    QVBoxLayout,
+    QFrame,
     QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QTextEdit,
-    QLabel,
-    QListWidget,
-    QMessageBox,
-    QListWidgetItem,
-    QLineEdit,
-    QCheckBox,
-    QFrame,
+    QVBoxLayout,
+    QWidget,
 )
 
-FILTER_FILE = "filters.txt"
-LOG_DIR = "logs"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FILTER_FILE = os.path.join(BASE_DIR, "filters.txt")
+LOG_DIR = os.path.join(BASE_DIR, "logs")
+ADB_FALLBACK_PATH = r"E:\platform-tools\adb.exe"
 
 DEFAULT_FILTERS = [
     "Vlion", "mentamob", "advlion", "Vungle", "Pangle",
-    "firebase", "analytics", "NebulaLog", "getaddrinfo", "gai_error"
+    "firebase", "analytics", "NebulaLog", "getaddrinfo", "gai_error",
 ]
 
 SUSPECT_WORDS = [
@@ -65,11 +64,13 @@ PROTOCOL_PATTERNS = {
     "UI": ["activity", "fragment", "view", "layout"],
 }
 
+
 def ensure_filter_file():
     if not os.path.exists(FILTER_FILE):
         with open(FILTER_FILE, "w", encoding="utf-8") as f:
             for item in DEFAULT_FILTERS:
                 f.write(item + "\n")
+
 
 def load_filters():
     ensure_filter_file()
@@ -81,6 +82,7 @@ def load_filters():
                 result.append(line)
     return result
 
+
 def append_filter(pattern):
     existing = load_filters()
     if pattern in existing:
@@ -88,27 +90,77 @@ def append_filter(pattern):
     with open(FILTER_FILE, "a", encoding="utf-8") as f:
         f.write(pattern + "\n")
 
-def adb_command(cmd):
+
+def resolve_adb_path():
+    candidates = [
+        os.path.join(BASE_DIR, "adb.exe"),
+        ADB_FALLBACK_PATH,
+        shutil.which("adb"),
+        shutil.which("adb.exe"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def adb_command(cmd, timeout=20):
+    adb_path = resolve_adb_path()
+    if not adb_path:
+        return False, "", "ADB non trovato. Metti adb.exe accanto allo script o nel PATH."
+
     try:
-        full = ["./adb.exe"] + cmd
-        result = subprocess.check_output(
-            full,
+        result = subprocess.run(
+            [adb_path] + cmd,
+            capture_output=True,
             text=True,
             encoding="utf-8",
-            errors="ignore"
+            errors="ignore",
+            timeout=timeout,
         )
-        return result.strip()
-    except Exception:
-        return ""
-
-# --- funzione per restart ADB ---
-def adb_restart():
-    try:
-        subprocess.run(["./adb.exe", "kill-server"])
-        subprocess.run(["./adb.exe", "start-server"])
-        print("ADB riavviato con successo.")
+        return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
+    except subprocess.TimeoutExpired:
+        return False, "", "ADB timeout"
     except Exception as e:
-        print(f"Errore nel riavvio di ADB: {e}")
+        return False, "", str(e)
+
+
+def get_connected_devices():
+    ok, output, error = adb_command(["devices"], timeout=10)
+    if not ok:
+        return [], error or output or "Errore durante adb devices"
+
+    devices = []
+    problems = []
+    for line in output.splitlines()[1:]:
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        serial, state = parts[0], parts[1]
+        if state == "device":
+            devices.append(serial)
+        else:
+            problems.append(f"{serial}: {state}")
+
+    if devices:
+        return devices, ""
+    if problems:
+        return [], "Device non pronto: " + ", ".join(problems)
+    return [], "Nessun device/emulatore rilevato"
+
+
+def adb_restart():
+    adb_path = resolve_adb_path()
+    if not adb_path:
+        return False, "ADB non trovato"
+
+    try:
+        subprocess.run([adb_path, "kill-server"], capture_output=True, text=True)
+        subprocess.run([adb_path, "start-server"], capture_output=True, text=True)
+        return True, "ADB riavviato"
+    except Exception as e:
+        return False, f"Errore nel riavvio di ADB: {e}"
+
 
 class LogcatThread(QThread):
     new_line = Signal(str, str)
@@ -116,14 +168,14 @@ class LogcatThread(QThread):
     pattern_found = Signal(str)
     stats_update = Signal(dict)
 
-    def __init__(self, package_name, raw_path, clean_path):
+    def __init__(self, package_name, raw_path, clean_path, filters=None):
         super().__init__()
         self.package_name = package_name
         self.raw_path = raw_path
         self.clean_path = clean_path
         self.running = True
         self.process = None
-        self.filters = load_filters()
+        self.filters = filters if filters is not None else load_filters()
         self.pattern_counter = {}
         self.stats = {
             "lines": 0,
@@ -138,7 +190,14 @@ class LogcatThread(QThread):
     def stop(self):
         self.running = False
         if self.process:
-            self.process.kill()
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+
+    def update_filters(self, filters):
+        self.filters = filters
 
     def should_filter(self, line):
         lower = line.lower()
@@ -170,14 +229,21 @@ class LogcatThread(QThread):
                         self.pattern_found.emit(word)
 
     def get_pid(self):
-        result = adb_command([
+        ok, output, error = adb_command([
             "shell",
             "pidof",
-            self.package_name
+            self.package_name,
         ])
-        return result
+        if ok:
+            return output
+        return ""
 
     def run(self):
+        adb_path = resolve_adb_path()
+        if not adb_path:
+            self.status.emit("ADB not found")
+            return
+
         pid = self.get_pid()
         if not pid:
             self.status.emit("PID not found")
@@ -185,58 +251,70 @@ class LogcatThread(QThread):
 
         self.status.emit(f"PID: {pid}")
 
-        raw_log = open(self.raw_path, "w", encoding="utf-8")
-        clean_log = open(self.clean_path, "w", encoding="utf-8")
-
         cmd = [
-            "./adb.exe",
+            adb_path,
             "logcat",
-            f"--pid={pid}"
+            f"--pid={pid}",
         ]
 
-        self.process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="ignore"
-        )
+        try:
+            with open(self.raw_path, "w", encoding="utf-8") as raw_log, open(
+                self.clean_path, "w", encoding="utf-8"
+            ) as clean_log:
+                self.process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                )
 
-        while self.running:
-            line = self.process.stdout.readline()
-            if not line:
-                break
-            line = line.rstrip()
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            proto = self.detect_protocol(line)
-            final = f"[{ts}] [{proto}] {line}"
-            self.stats["lines"] += 1
-            if proto == "BLE":
-                self.stats["ble"] += 1
-            elif proto == "PAIR":
-                self.stats["pair"] += 1
-            elif proto == "TLS":
-                self.stats["tls"] += 1
-            elif proto == "UDP":
-                self.stats["udp"] += 1
-            elif proto == "TUTK":
-                self.stats["tutk"] += 1
-            raw_log.write(final + "\n")
-            raw_log.flush()
-            self.detect_patterns(line)
-            if self.should_filter(line):
-                self.stats["filtered"] += 1
-                self.stats_update.emit(self.stats)
-                continue
-            clean_log.write(final + "\n")
-            clean_log.flush()
-            self.new_line.emit(final, proto)
-            self.stats_update.emit(self.stats)
+                if not self.process.stdout:
+                    self.status.emit("Logcat output not available")
+                    return
 
-        raw_log.close()
-        clean_log.close()
+                while self.running:
+                    line = self.process.stdout.readline()
+                    if not line:
+                        break
+
+                    line = line.rstrip()
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                    proto = self.detect_protocol(line)
+                    final = f"[{ts}] [{proto}] {line}"
+
+                    self.stats["lines"] += 1
+                    if proto == "BLE":
+                        self.stats["ble"] += 1
+                    elif proto == "PAIR":
+                        self.stats["pair"] += 1
+                    elif proto == "TLS":
+                        self.stats["tls"] += 1
+                    elif proto == "UDP":
+                        self.stats["udp"] += 1
+                    elif proto == "TUTK":
+                        self.stats["tutk"] += 1
+
+                    raw_log.write(final + "\n")
+                    raw_log.flush()
+                    self.detect_patterns(line)
+
+                    if self.should_filter(line):
+                        self.stats["filtered"] += 1
+                        self.stats_update.emit(dict(self.stats))
+                        continue
+
+                    clean_log.write(final + "\n")
+                    clean_log.flush()
+                    self.new_line.emit(final, proto)
+                    self.stats_update.emit(dict(self.stats))
+        except Exception as e:
+            self.status.emit(f"Logcat error: {e}")
+            return
+
         self.status.emit("Stopped")
+
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -246,10 +324,11 @@ class MainWindow(QWidget):
         self.setWindowTitle("Yi Reverse Console v1.03")
         self.resize(1700, 950)
         self.init_ui()
+        self.update_capture_buttons()
 
     def init_ui(self):
         root = QVBoxLayout()
-        # TOP BAR
+
         top = QHBoxLayout()
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search package...")
@@ -257,7 +336,7 @@ class MainWindow(QWidget):
         self.start_btn = QPushButton("START")
         self.stop_btn = QPushButton("STOP")
         self.reload_btn = QPushButton("RELOAD FILTERS")
-        self.restart_adb_btn = QPushButton("RESTART ADB")  # nuovo bottone
+        self.restart_adb_btn = QPushButton("RESTART ADB")
         self.status_label = QLabel("Idle")
 
         top.addWidget(self.search_box)
@@ -269,14 +348,15 @@ class MainWindow(QWidget):
         top.addWidget(self.status_label)
         root.addLayout(top)
 
-        # CENTRO (resto UI invariato)
         center = QHBoxLayout()
         self.app_list = QListWidget()
         self.app_list.setMinimumWidth(260)
         center.addWidget(self.app_list, 1)
+
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
         center.addWidget(self.log_view, 5)
+
         right = QVBoxLayout()
         right.addWidget(QLabel("PATTERNS"))
         self.pattern_list = QListWidget()
@@ -284,9 +364,11 @@ class MainWindow(QWidget):
         right.addWidget(QLabel("ACTIVE FILTERS"))
         self.filter_list = QListWidget()
         right.addWidget(self.filter_list)
+
         line = QFrame()
         line.setFrameShape(QFrame.HLine)
         right.addWidget(line)
+
         self.stats_label = QLabel(
             "LINES: 0\n"
             "FILTERED: 0\n"
@@ -300,29 +382,52 @@ class MainWindow(QWidget):
         center.addLayout(right, 1)
         root.addLayout(center)
         self.setLayout(root)
-        # PANELLO FILTRI
+
         self.populate_filter_panel()
-        # SIGNALS
+
         self.scan_btn.clicked.connect(self.scan_apps)
         self.start_btn.clicked.connect(self.start_capture)
         self.stop_btn.clicked.connect(self.stop_capture)
         self.reload_btn.clicked.connect(self.reload_filters)
         self.pattern_list.itemDoubleClicked.connect(self.add_pattern_to_filters)
         self.search_box.textChanged.connect(self.filter_app_list)
-        self.restart_adb_btn.clicked.connect(self.handle_restart_adb)  # collegamento bottone
+        self.filter_list.itemChanged.connect(self.apply_runtime_filters)
+        self.restart_adb_btn.clicked.connect(self.handle_restart_adb)
+
+    def update_capture_buttons(self):
+        running = self.thread is not None
+        self.start_btn.setEnabled(not running)
+        self.stop_btn.setEnabled(running)
 
     def handle_restart_adb(self):
         self.status_label.setText("Riavvio ADB in corso...")
-        adb_restart()
-        self.status_label.setText("ADB riavviato")
+        ok, message = adb_restart()
+        self.status_label.setText(message)
+        if not ok:
+            QMessageBox.warning(self, "ADB", message)
 
     def populate_filter_panel(self):
+        self.filter_list.blockSignals(True)
         self.filter_list.clear()
         for item in load_filters():
             check = QListWidgetItem(item)
             check.setFlags(check.flags() | Qt.ItemIsUserCheckable)
             check.setCheckState(Qt.Checked)
             self.filter_list.addItem(check)
+        self.filter_list.blockSignals(False)
+        self.apply_runtime_filters()
+
+    def active_filters(self):
+        filters = []
+        for i in range(self.filter_list.count()):
+            item = self.filter_list.item(i)
+            if item.checkState() == Qt.Checked:
+                filters.append(item.text())
+        return filters
+
+    def apply_runtime_filters(self):
+        if self.thread:
+            self.thread.update_filters(self.active_filters())
 
     def filter_app_list(self, text):
         text = text.lower()
@@ -334,13 +439,26 @@ class MainWindow(QWidget):
         self.app_list.clear()
         self.packages.clear()
         self.status_label.setText("Scanning user apps...")
-        output = adb_command([
+
+        devices, device_error = get_connected_devices()
+        if not devices:
+            self.status_label.setText(device_error)
+            QMessageBox.warning(self, "ADB", device_error)
+            return
+
+        ok, output, error = adb_command([
             "shell",
             "pm",
             "list",
             "packages",
-            "-3"
+            "-3",
         ])
+        if not ok:
+            message = error or output or "Impossibile leggere le app utente"
+            self.status_label.setText(message)
+            QMessageBox.warning(self, "ADB", message)
+            return
+
         packages = []
         for line in output.splitlines():
             line = line.strip()
@@ -348,78 +466,78 @@ class MainWindow(QWidget):
                 continue
             package = line.replace("package:", "").strip()
             packages.append(package)
+
         packages.sort()
         for package in packages:
-            pid = adb_command([
+            ok, pid, _ = adb_command([
                 "shell",
                 "pidof",
-                package
+                package,
             ])
-            if pid:
-                display = f"🟢 {package}    [PID {pid}]"
+            if ok and pid:
+                display = f"[RUN] {package}    [PID {pid}]"
             else:
-                display = f"⚪ {package}"
+                display = f"[OFF] {package}"
+
             item = QListWidgetItem(display)
             item.setData(Qt.UserRole, package)
-            if pid:
+            if ok and pid:
                 item.setBackground(QColor(20, 90, 60))
             self.app_list.addItem(item)
-        self.status_label.setText(f"User apps found: {len(packages)}")
+
+        self.status_label.setText(f"User apps found: {len(packages)} | Device: {devices[0]}")
 
     def start_capture(self):
         if self.thread:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Already running"
-            )
+            QMessageBox.warning(self, "Warning", "Already running")
             return
+
         selected = self.app_list.currentItem()
         if not selected:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Select app"
-            )
+            QMessageBox.warning(self, "Warning", "Select app")
             return
+
         package = selected.data(Qt.UserRole)
         os.makedirs(LOG_DIR, exist_ok=True)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         raw_log = os.path.join(LOG_DIR, f"{timestamp}_raw.log")
         clean_log = os.path.join(LOG_DIR, f"{timestamp}_clean.log")
+
         self.log_view.clear()
-        self.thread = LogcatThread(package, raw_log, clean_log)
+        self.thread = LogcatThread(package, raw_log, clean_log, self.active_filters())
         self.thread.new_line.connect(self.append_log)
         self.thread.status.connect(self.update_status)
         self.thread.pattern_found.connect(self.add_pattern)
         self.thread.stats_update.connect(self.update_stats)
         self.thread.finished.connect(self.capture_finished)
         self.thread.start()
+        self.update_capture_buttons()
 
     def stop_capture(self):
         if self.thread:
+            self.status_label.setText("Stopping...")
             self.thread.stop()
 
     def capture_finished(self):
         self.thread = None
+        self.update_capture_buttons()
 
     def append_log(self, line, proto):
-        color = "#AAAAAA"  # default: grigio chiaro
+        color = "#AAAAAA"
         if proto == "BLE":
-            color = "#00BFFF"   # DeepSkyBlue
+            color = "#00BFFF"
         elif proto == "PAIR":
-            color = "#228B22"   # ForestGreen
+            color = "#228B22"
         elif proto == "TLS":
-            color = "#FF4500"   # OrangeRed
+            color = "#FF4500"
         elif proto == "UDP":
-            color = "#6A5ACD"   # SlateBlue
+            color = "#6A5ACD"
         elif proto == "TUTK":
-            color = "#FF1493"   # DeepPink
+            color = "#FF1493"
         elif proto == "UI":
-            color = "#3333FF"   # strong blue
-        self.log_view.append(
-            f'<span style="color:{color}">{line}</span>'
-        )
+            color = "#3333FF"
+
+        self.log_view.append(f'<span style="color:{color}">{line}</span>')
         cursor = self.log_view.textCursor()
         cursor.movePosition(QTextCursor.End)
         self.log_view.setTextCursor(cursor)
@@ -455,6 +573,13 @@ class MainWindow(QWidget):
     def reload_filters(self):
         self.populate_filter_panel()
         self.status_label.setText("Filters reloaded")
+
+    def closeEvent(self, event):
+        if self.thread:
+            self.thread.stop()
+            self.thread.wait(3000)
+        event.accept()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

@@ -67,3 +67,6 @@ cn.vlion.ad.total.mix.base.bean.vlionserviceconfig
 cn.vlion.ad.total.mix.core.x
 cn.vlion.ad.total.mix.ad.init.vlioncustomadapter
 vunglesplash
+vunglebanner
+logvlion
+vlionmentathreadpool
