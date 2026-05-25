@@ -21,4 +21,4 @@ Un tool grafico per analisi avanzate di log Android via ADB, con filtro runtime,
 
 ## Autore
 
-*Inserisci qui il tuo nome o nickname*
+*Bruno*
