@@ -20,6 +20,6 @@ Un tool grafico per analisi avanzate di log Android via ADB, con filtro runtime,
 - `logs/`: log raw e puliti
 
 ## ROADMAP
-![Roadmap finale](roadmap.png)
+![Roadmap finale](Roadmap.png)
 
 *Bruno*
