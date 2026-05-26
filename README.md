@@ -20,21 +20,6 @@ Un tool grafico per analisi avanzate di log Android via ADB, con filtro runtime,
 - `logs/`: log raw e puliti
 
 ## ROADMAP
+![Roadmap finale](roadmap.png)
 
-┌─────────────────────────────────────┐
-│ SOURCE CONTROL                      │
-│ [ADB] [ETH] [WLAN] [BLE]            │
-└─────────────────────────────────────┘
-┌──────────────┬──────────────┬──────────────┐
-│ ADB PANEL    │ ETH PANEL    │ WLAN PANEL   │
-│              │              │              │
-│ runtime      │ packets      │ monitor      │
-│ activities   │ ports        │ discovery    │
-│ pair events  │ protocols    │ broadcasts   │
-└──────────────┴──────────────┴──────────────┘
-┌─────────────────────────────────────┐
-│ GLOBAL TIMELINE                     │
-└─────────────────────────────────────┘
-
-By
 *Bruno*
