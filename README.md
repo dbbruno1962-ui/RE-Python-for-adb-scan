@@ -10,7 +10,7 @@ Un tool grafico per analisi avanzate di log Android via ADB, con filtro runtime,
 
 ## Uso
 
-1. Avvia un emulatore Android o collega un dispositivo
+1. Avvia un emulatore Android o collega un dispositivo in Developer mode enabled
 2. Avvia questo script
 3. Clicca "SCAN APPS", seleziona un'app e poi "START"
 
