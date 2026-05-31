@@ -1,0 +1,41 @@
+import json
+from pathlib import Path
+
+REGISTRY_FILE = "devices.json"
+
+
+class DeviceRegistry:
+
+    def __init__(self):
+        self.devices = {}
+        self.load()
+
+    def load(self):
+        if Path(REGISTRY_FILE).exists():
+            with open(REGISTRY_FILE, "r", encoding="utf-8") as f:
+                self.devices = json.load(f)
+
+    def save(self):
+        with open(REGISTRY_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.devices, f, indent=2)
+
+    def add_device(self, mac, alias="", category="unknown"):
+        if mac not in self.devices:
+            self.devices[mac] = {
+                "alias": alias,
+                "category": category,
+                "ignored": False,
+                "notes": ""
+            }
+            self.save()
+
+    def set_ignore(self, mac, state):
+        if mac in self.devices:
+            self.devices[mac]["ignored"] = state
+            self.save()
+
+    def get_device(self, mac):
+        return self.devices.get(mac)
+
+    def is_ignored(self, mac):
+        return self.devices.get(mac, {}).get("ignored", False)

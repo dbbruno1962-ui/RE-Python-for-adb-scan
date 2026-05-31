@@ -1,5 +1,5 @@
 # log_console_v1_03.py
-# Yi Reverse Console v1.03
+# Reverse Console v1.03
 
 # New Features:
 # - Runtime filter panel
@@ -64,6 +64,76 @@ PROTOCOL_PATTERNS = {
     "UI": ["activity", "fragment", "view", "layout"],
 }
 
+# ============================================
+# SOURCE / WIFI RUNTIME CONTEXT
+# Future multi-source RE architecture
+# ============================================
+
+class SourceType:
+    ADB = "ADB"
+    WIFI_CONNECTED = "WIFI_CONNECTED"
+    WIFI_MONITOR = "WIFI_MONITOR"
+    ETH = "ETH"
+
+
+class WifiMode:
+    DISABLED = 0
+    CONNECTED = 1
+    MONITOR = 2
+
+
+class RuntimeContext:
+    def __init__(self):
+
+        # Current active source
+        self.source_type = SourceType.ADB
+
+        # WiFi runtime mode
+        self.wifi_mode = WifiMode.DISABLED
+
+        # Runtime flags
+        self.capture_enabled = False
+        self.has_ip = False
+        self.monitor_capable = False
+
+        # Runtime info
+        self.interface_name = ""
+        self.ssid = ""
+
+        # Future timestamp sync support
+        self.time_sync_enabled = False
+
+        # Future Wireshark integration
+        self.wireshark_active = False
+
+    def set_wifi_connected(self, iface="", ssid=""):
+        self.source_type = SourceType.WIFI_CONNECTED
+        self.wifi_mode = WifiMode.CONNECTED
+        self.capture_enabled = True
+        self.has_ip = True
+        self.interface_name = iface
+        self.ssid = ssid
+
+    def set_wifi_monitor(self, iface=""):
+        self.source_type = SourceType.WIFI_MONITOR
+        self.wifi_mode = WifiMode.MONITOR
+        self.capture_enabled = True
+        self.has_ip = False
+        self.interface_name = iface
+
+    def set_adb(self):
+        self.source_type = SourceType.ADB
+
+    def disable_wifi(self):
+        self.wifi_mode = WifiMode.DISABLED
+        self.capture_enabled = False
+        self.has_ip = False
+        self.interface_name = ""
+        self.ssid = ""
+
+
+# Global runtime context
+RUNTIME_CONTEXT = RuntimeContext()
 
 def ensure_filter_file():
     if not os.path.exists(FILTER_FILE):
