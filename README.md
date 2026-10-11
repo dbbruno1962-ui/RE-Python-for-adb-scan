@@ -43,8 +43,16 @@ del progetto, quindi il comando puo' essere lanciato da qualsiasi posizione.
 - `filters.txt`: filtri attivi.
 - `filters_candidates.txt`: catalogo dei pattern candidati.
 - `devices.json`: registro locale dei dispositivi.
-- `logs/`: log raw, clean e archivi selezionati.
+- `logs/`: output locale delle catture, escluso dal controllo di versione.
+- `examples/`: campioni sintetici e bonificati del formato dei log.
 - `notes/`: roadmap e note di progetto.
+
+## Privacy dei log
+
+Le catture reali possono contenere identificatori di dispositivo, indirizzi di
+rete, metadati di app e altri dati operativi. Per questo `logs/` non viene
+versionata. I campioni in `examples/` sono sintetici e non provengono da una
+cattura reale.
 
 ## Roadmap
 

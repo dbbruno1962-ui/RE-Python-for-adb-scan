@@ -1,0 +1,3 @@
+[2026-01-01 10:00:00.000] [WIFI] wlan0 inet 192.0.2.10/24
+[2026-01-01 10:00:00.000] [WIFI] SSID: <redacted>, BSSID: <redacted>, RSSI: -52
+[2026-01-01 10:00:00.000] [WIFI] Network state: CONNECTED
