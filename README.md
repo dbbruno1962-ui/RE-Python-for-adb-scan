@@ -1,5 +1,7 @@
 # RE Console v1.03
 
+English version: [README_EN.md](README_EN.md)
+
 Tool grafico per acquisizione e correlazione di log Android via ADB, con
 filtraggio runtime, catalogo pattern e snapshot Wi-Fi sincronizzati.
 
