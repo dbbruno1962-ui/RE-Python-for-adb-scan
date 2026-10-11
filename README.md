@@ -1,6 +1,6 @@
 # RE Console v1.03
 
-English version: [README_EN.md](README_EN.md)
+[Italiano](README.md) | [English](README_EN.md)
 
 Tool grafico per acquisizione e correlazione di log Android via ADB, con
 filtraggio runtime, catalogo pattern e snapshot Wi-Fi sincronizzati.
@@ -37,6 +37,51 @@ Oppure dalla directory del progetto:
 
 I percorsi di configurazione e dei log sono risolti rispetto alla directory
 del progetto, quindi il comando puo' essere lanciato da qualsiasi posizione.
+
+## ADB via Wi-Fi (Android 8.1 / ADB TCP/IP)
+
+Questa procedura usa il protocollo ADB TCP/IP classico sulla porta `5555`; non
+e' il comando `adb pair` delle versioni Android piu' recenti. Il primo
+passaggio richiede ancora il cavo USB e l'autorizzazione di debug sul telefono.
+
+Con il telefono collegato via USB:
+
+```sh
+adb devices
+adb -s <SERIAL_USB> tcpip 5555
+adb -s <SERIAL_USB> shell ip -f inet addr show wlan0
+```
+
+Annotare l'indirizzo IPv4 di `wlan0`, scollegare il cavo USB e, dal computer
+sulla stessa LAN, collegarsi al telefono:
+
+```sh
+adb connect <IP_TELEFONO>:5555
+adb devices
+```
+
+Lo stato deve risultare `device`; a quel punto RE Console si usa normalmente:
+eseguire la scansione delle app e avviare la cattura. Per esempio, i messaggi
+`light_meter` dell'app luxmeter continuano a passare attraverso la stessa
+pipeline logcat, senza una sorgente dedicata.
+
+La versione attuale della console invoca `adb` senza `-s <serial>`. Prima di
+avviarla, lasciare quindi un solo target ADB nello stato `device`: dopo il
+passaggio Wi-Fi, scollegare l'USB. Per riconnettere dopo una caduta di rete:
+
+```sh
+adb connect <IP_TELEFONO>:5555
+```
+
+Per tornare a USB, ricollegare il cavo e usare:
+
+```sh
+adb -s <SERIAL_USB> usb
+adb disconnect <IP_TELEFONO>:5555
+```
+
+ADB su TCP/IP non cifra ne' autentica nuovamente ogni connessione sulla porta
+`5555`: abilitarlo soltanto su una LAN fidata e disattivarlo quando non serve.
 
 ## Struttura
 

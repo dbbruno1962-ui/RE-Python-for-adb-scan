@@ -1,5 +1,7 @@
 # RE Console v1.03
 
+[Italiano](README.md) | [English](README_EN.md)
+
 Graphical tool for Android log acquisition and correlation through ADB, with
 runtime filtering, a pattern catalog, and synchronized Wi-Fi snapshots.
 
@@ -35,6 +37,52 @@ Or run it from the project directory:
 
 Configuration and log paths are resolved relative to the project directory,
 so the launcher can be run from any location.
+
+## ADB over Wi-Fi (Android 8.1 / ADB TCP/IP)
+
+This uses the legacy ADB TCP/IP protocol on port `5555`; it is not the
+`adb pair` flow used by newer Android versions. The initial step still needs a
+USB cable and an authorized debugging connection on the phone.
+
+With the phone connected by USB:
+
+```sh
+adb devices
+adb -s <USB_SERIAL> tcpip 5555
+adb -s <USB_SERIAL> shell ip -f inet addr show wlan0
+```
+
+Note the IPv4 address assigned to `wlan0`, unplug the USB cable, then connect
+from a computer on the same LAN:
+
+```sh
+adb connect <PHONE_IP>:5555
+adb devices
+```
+
+The device must show the `device` state. RE Console can then be used normally:
+scan the apps and start capture. For example, `light_meter` messages produced
+by a lux-meter app continue through the existing logcat pipeline; no dedicated
+source is needed.
+
+The current console runs `adb` without `-s <serial>`. Before launching it,
+leave only one ADB target in the `device` state: after switching to Wi-Fi,
+unplug USB. To reconnect after a network interruption:
+
+```sh
+adb connect <PHONE_IP>:5555
+```
+
+To return to USB, reconnect the cable and run:
+
+```sh
+adb -s <USB_SERIAL> usb
+adb disconnect <PHONE_IP>:5555
+```
+
+ADB over TCP/IP does not encrypt or re-authenticate every connection on port
+`5555`; enable it only on a trusted LAN and disable it when it is no longer
+needed.
 
 ## Repository layout
 
