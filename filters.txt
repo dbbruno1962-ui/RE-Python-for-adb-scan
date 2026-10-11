@@ -70,3 +70,26 @@ vunglesplash
 vunglebanner
 logvlion
 vlionmentathreadpool
+bannergrade
+com.vungle.ads.internal.ui.vungleactivity
+vungleactivity
+advertising
+AdvertisingIdClient
+TopOn
+bannerGrade
+AdUtil
+com.google.android.gms.ads
+ads
+AdSourceId
+applovin.com
+TradPlus
+TradPlusLog
+getGDPRDataCollection
+AdMob
+Fyber
+Request Ad failed
+NO_FILL
+adType
+adStatus
+doubleclick.net
+TNPXGBC-456608-YHPRG

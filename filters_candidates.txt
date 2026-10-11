@@ -1,0 +1,85 @@
+# Yi IoT static filter catalog
+# Source: E:/Downloads/YiIotHome
+# Package: com.yunyi.smartcamera
+# Version: 5.0.9_20260515 (versionCode 3790)
+#
+# This is a review catalog, not an active filter list.
+# Do not promote entries to filters.txt automatically.
+
+[AD_MEDIATION]
+TradPlus
+TradPlusLog
+TradPlusAd
+Vungle
+vungle
+VungleAd
+AppLovin
+applovin
+Pangle
+pangle
+MentaMob
+mentamob
+MossTurbo
+mossturbo
+AdMob
+Google Mobile Ads
+com.google.android.gms.ads
+Audience Network
+Facebook Ads
+Inneractive
+inner-active
+Fyber
+advlion
+Vlion
+vlion
+TopOn
+banner
+loadbannerad
+bannerlist02
+vunglesplash
+vunglebanner
+maxbanner
+ads
+advertising
+
+[AD_DOMAINS]
+ads.google.com
+doubleclick.net
+graph.facebook.com
+applovin.com
+applvn.com
+vungle.com
+advlion.com
+mentamob.com
+mossturbo.com
+inner-active.mobi
+funlinkads.com
+tradplus.com
+
+[AD_CLASSES_OR_MARKERS]
+AdvertisingIdClient
+TradPlusLog
+getGDPRDataCollection
+AdUtil
+Ads
+bannerGrade
+AdSourceId
+NO_FILL
+Request Ad failed
+adType
+adStatus
+
+[NETWORK_DIAGNOSTIC_NOT_AD]
+# Keep these out of filters.txt: they identify resolver/network failures.
+getaddrinfo
+gai_error
+NetworkInfo
+ConnectivityManager
+DNS
+socket timeout
+HTTP timeout
+
+[REVIEW_RULES]
+# Keep raw logs unchanged.
+# Use this catalog only to tag ADV_KNOWN candidates.
+# Promote an entry to filters.txt only after repeated confirmation.

@@ -1,5 +1,5 @@
 # log_console_v1_03.py
-# Reverse Console v1.03
+# Yi Reverse Console v1.03
 
 # New Features:
 # - Runtime filter panel
@@ -18,7 +18,6 @@
 
 import os
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -40,203 +39,35 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FILTER_FILE = os.path.join(BASE_DIR, "filters.txt")
-LOG_DIR = os.path.join(BASE_DIR, "logs")
-ADB_FALLBACK_PATH = r"E:\platform-tools\adb.exe"
+from core.adb_manager import adb_command, adb_restart, get_connected_devices, resolve_adb_path
+from core.filter_manager import (
+    append_filter,
+    load_filter_candidates,
+    load_filters,
+    map_proto,
+)
+from core.runtime import RuntimeContext
+from core.wifi_manager import WifiLoggerThread
 
-DEFAULT_FILTERS = [
-    "Vlion", "mentamob", "advlion", "Vungle", "Pangle",
-    "firebase", "analytics", "NebulaLog", "getaddrinfo", "gai_error",
-]
+RUNTIME = RuntimeContext.from_file(__file__)
+BASE_DIR = str(RUNTIME.base_dir)
+FILTER_FILE = str(RUNTIME.filter_file)
+CANDIDATE_FILE = os.path.join(BASE_DIR, "filters_candidates.txt")
+LOG_DIR = str(RUNTIME.log_dir)
 
 SUSPECT_WORDS = [
     "ad", "analytics", "banner", "firebase", "menta", "vlion",
     "vungle", "campaign", "applovin",
 ]
 
-PROTOCOL_PATTERNS = {
-    "BLE": ["bluetooth", "blescan", "gatt", "btbind"],
-    "PAIR": ["configwifi", "pair", "bind", "choicemodeactivity"],
-    "TLS": ["443", "okhttp", "https", "tls"],
-    "UDP": ["udp", "9377", "broadcast"],
-    "TUTK": ["tutk", "iotc", "avapi"],
-    "UI": ["activity", "fragment", "view", "layout"],
-}
-
-# ============================================
-# SOURCE / WIFI RUNTIME CONTEXT
-# Future multi-source RE architecture
-# ============================================
-
-class SourceType:
-    ADB = "ADB"
-    WIFI_CONNECTED = "WIFI_CONNECTED"
-    WIFI_MONITOR = "WIFI_MONITOR"
-    ETH = "ETH"
-
-
-class WifiMode:
-    DISABLED = 0
-    CONNECTED = 1
-    MONITOR = 2
-
-
-class RuntimeContext:
-    def __init__(self):
-
-        # Current active source
-        self.source_type = SourceType.ADB
-
-        # WiFi runtime mode
-        self.wifi_mode = WifiMode.DISABLED
-
-        # Runtime flags
-        self.capture_enabled = False
-        self.has_ip = False
-        self.monitor_capable = False
-
-        # Runtime info
-        self.interface_name = ""
-        self.ssid = ""
-
-        # Future timestamp sync support
-        self.time_sync_enabled = False
-
-        # Future Wireshark integration
-        self.wireshark_active = False
-
-    def set_wifi_connected(self, iface="", ssid=""):
-        self.source_type = SourceType.WIFI_CONNECTED
-        self.wifi_mode = WifiMode.CONNECTED
-        self.capture_enabled = True
-        self.has_ip = True
-        self.interface_name = iface
-        self.ssid = ssid
-
-    def set_wifi_monitor(self, iface=""):
-        self.source_type = SourceType.WIFI_MONITOR
-        self.wifi_mode = WifiMode.MONITOR
-        self.capture_enabled = True
-        self.has_ip = False
-        self.interface_name = iface
-
-    def set_adb(self):
-        self.source_type = SourceType.ADB
-
-    def disable_wifi(self):
-        self.wifi_mode = WifiMode.DISABLED
-        self.capture_enabled = False
-        self.has_ip = False
-        self.interface_name = ""
-        self.ssid = ""
-
-
-# Global runtime context
-RUNTIME_CONTEXT = RuntimeContext()
-
-def ensure_filter_file():
-    if not os.path.exists(FILTER_FILE):
-        with open(FILTER_FILE, "w", encoding="utf-8") as f:
-            for item in DEFAULT_FILTERS:
-                f.write(item + "\n")
-
-
-def load_filters():
-    ensure_filter_file()
-    result = []
-    with open(FILTER_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                result.append(line)
-    return result
-
-
-def append_filter(pattern):
-    existing = load_filters()
-    if pattern in existing:
-        return
-    with open(FILTER_FILE, "a", encoding="utf-8") as f:
-        f.write(pattern + "\n")
-
-
-def resolve_adb_path():
-    candidates = [
-        os.path.join(BASE_DIR, "adb.exe"),
-        ADB_FALLBACK_PATH,
-        shutil.which("adb"),
-        shutil.which("adb.exe"),
-    ]
-    for candidate in candidates:
-        if candidate and os.path.exists(candidate):
-            return candidate
-    return None
-
-
-def adb_command(cmd, timeout=20):
-    adb_path = resolve_adb_path()
-    if not adb_path:
-        return False, "", "ADB non trovato. Metti adb.exe accanto allo script o nel PATH."
-
-    try:
-        result = subprocess.run(
-            [adb_path] + cmd,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="ignore",
-            timeout=timeout,
-        )
-        return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
-    except subprocess.TimeoutExpired:
-        return False, "", "ADB timeout"
-    except Exception as e:
-        return False, "", str(e)
-
-
-def get_connected_devices():
-    ok, output, error = adb_command(["devices"], timeout=10)
-    if not ok:
-        return [], error or output or "Errore durante adb devices"
-
-    devices = []
-    problems = []
-    for line in output.splitlines()[1:]:
-        parts = line.split()
-        if len(parts) < 2:
-            continue
-        serial, state = parts[0], parts[1]
-        if state == "device":
-            devices.append(serial)
-        else:
-            problems.append(f"{serial}: {state}")
-
-    if devices:
-        return devices, ""
-    if problems:
-        return [], "Device non pronto: " + ", ".join(problems)
-    return [], "Nessun device/emulatore rilevato"
-
-
-def adb_restart():
-    adb_path = resolve_adb_path()
-    if not adb_path:
-        return False, "ADB non trovato"
-
-    try:
-        subprocess.run([adb_path, "kill-server"], capture_output=True, text=True)
-        subprocess.run([adb_path, "start-server"], capture_output=True, text=True)
-        return True, "ADB riavviato"
-    except Exception as e:
-        return False, f"Errore nel riavvio di ADB: {e}"
-
 
 class LogcatThread(QThread):
     new_line = Signal(str, str)
     status = Signal(str)
     pattern_found = Signal(str)
+    catalog_pattern_found = Signal(str)
     stats_update = Signal(dict)
+    app_started = Signal(str)
 
     def __init__(self, package_name, raw_path, clean_path, filters=None):
         super().__init__()
@@ -245,7 +76,9 @@ class LogcatThread(QThread):
         self.clean_path = clean_path
         self.running = True
         self.process = None
-        self.filters = filters if filters is not None else load_filters()
+        self.filters = filters if filters is not None else load_filters(FILTER_FILE)
+        self.filter_candidates = load_filter_candidates(CANDIDATE_FILE)
+        self.catalog_seen = set()
         self.pattern_counter = {}
         self.stats = {
             "lines": 0,
@@ -277,15 +110,23 @@ class LogcatThread(QThread):
         return False
 
     def detect_protocol(self, line):
-        lower = line.lower()
-        for proto, patterns in PROTOCOL_PATTERNS.items():
-            for item in patterns:
-                if item in lower:
-                    return proto
-        return "GEN"
+        return map_proto(line)
 
     def detect_patterns(self, line):
         lower = line.lower()
+        for candidate in self.filter_candidates:
+            candidate_lower = candidate.lower()
+            if len(candidate_lower) <= 4:
+                match = re.search(
+                    rf"(?<![a-z0-9]){re.escape(candidate_lower)}(?![a-z0-9])",
+                    lower,
+                )
+            else:
+                match = candidate_lower in lower
+            if match and candidate_lower not in self.catalog_seen:
+                self.catalog_seen.add(candidate_lower)
+                self.catalog_pattern_found.emit(candidate)
+
         words = re.findall(r"[a-zA-Z0-9\.\-_]+", lower)
         for word in words:
             if len(word) < 6:
@@ -320,6 +161,7 @@ class LogcatThread(QThread):
             return
 
         self.status.emit(f"PID: {pid}")
+        self.app_started.emit(f"package={self.package_name} pid={pid}")
 
         cmd = [
             adb_path,
@@ -390,6 +232,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.thread = None
+        self.wifi_thread = None
         self.packages = {}
         self.setWindowTitle("Yi Reverse Console v1.03")
         self.resize(1700, 950)
@@ -465,7 +308,7 @@ class MainWindow(QWidget):
         self.restart_adb_btn.clicked.connect(self.handle_restart_adb)
 
     def update_capture_buttons(self):
-        running = self.thread is not None
+        running = self.thread is not None or self.wifi_thread is not None
         self.start_btn.setEnabled(not running)
         self.stop_btn.setEnabled(running)
 
@@ -479,7 +322,7 @@ class MainWindow(QWidget):
     def populate_filter_panel(self):
         self.filter_list.blockSignals(True)
         self.filter_list.clear()
-        for item in load_filters():
+        for item in load_filters(FILTER_FILE):
             check = QListWidgetItem(item)
             check.setFlags(check.flags() | Qt.ItemIsUserCheckable)
             check.setCheckState(Qt.Checked)
@@ -572,14 +415,23 @@ class MainWindow(QWidget):
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         raw_log = os.path.join(LOG_DIR, f"{timestamp}_raw.log")
         clean_log = os.path.join(LOG_DIR, f"{timestamp}_clean.log")
+        wifi_raw_log = os.path.join(LOG_DIR, f"{timestamp}_wifi_raw.log")
+        wifi_clean_log = os.path.join(LOG_DIR, f"{timestamp}_wifi_clean.log")
 
         self.log_view.clear()
         self.thread = LogcatThread(package, raw_log, clean_log, self.active_filters())
         self.thread.new_line.connect(self.append_log)
         self.thread.status.connect(self.update_status)
         self.thread.pattern_found.connect(self.add_pattern)
+        self.thread.catalog_pattern_found.connect(self.add_catalog_pattern)
         self.thread.stats_update.connect(self.update_stats)
         self.thread.finished.connect(self.capture_finished)
+        self.wifi_thread = WifiLoggerThread(wifi_raw_log, wifi_clean_log)
+        self.wifi_thread.new_line.connect(self.append_log)
+        self.wifi_thread.status.connect(self.update_status)
+        self.wifi_thread.finished.connect(self.wifi_capture_finished)
+        self.thread.app_started.connect(self.wifi_thread.mark_app_start)
+        self.wifi_thread.start()
         self.thread.start()
         self.update_capture_buttons()
 
@@ -587,9 +439,15 @@ class MainWindow(QWidget):
         if self.thread:
             self.status_label.setText("Stopping...")
             self.thread.stop()
+        if self.wifi_thread:
+            self.wifi_thread.stop()
 
     def capture_finished(self):
         self.thread = None
+        self.update_capture_buttons()
+
+    def wifi_capture_finished(self):
+        self.wifi_thread = None
         self.update_capture_buttons()
 
     def append_log(self, line, proto):
@@ -606,6 +464,8 @@ class MainWindow(QWidget):
             color = "#FF1493"
         elif proto == "UI":
             color = "#3333FF"
+        elif proto == "WIFI":
+            color = "#008B8B"
 
         self.log_view.append(f'<span style="color:{color}">{line}</span>')
         cursor = self.log_view.textCursor()
@@ -632,11 +492,28 @@ class MainWindow(QWidget):
             for i in range(self.pattern_list.count())
         ]
         if pattern not in items:
-            self.pattern_list.addItem(pattern)
+            item = QListWidgetItem(pattern)
+            item.setData(Qt.UserRole, pattern)
+            self.pattern_list.addItem(item)
+
+    def add_catalog_pattern(self, pattern):
+        for i in range(self.pattern_list.count()):
+            item = self.pattern_list.item(i)
+            if item.data(Qt.UserRole) == pattern:
+                return
+
+        item = QListWidgetItem(f"[CATALOG] {pattern}")
+        item.setData(Qt.UserRole, pattern)
+        item.setForeground(QColor("#FFB000"))
+        item.setToolTip("Candidato catalogato: doppio clic per aggiungerlo a filters.txt")
+        self.pattern_list.addItem(item)
 
     def add_pattern_to_filters(self, item):
-        pattern = item.text()
-        append_filter(pattern)
+        pattern = item.data(Qt.UserRole) or item.text()
+        append_filter(FILTER_FILE, pattern)
+        if self.thread:
+            self.thread.update_filters(self.active_filters())
+        item.setText('[ADDED] ' + pattern)
         self.populate_filter_panel()
         self.status_label.setText(f"Filter added: {pattern}")
 

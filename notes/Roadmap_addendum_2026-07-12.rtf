@@ -1,0 +1,36 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Consolas;}}
+\f0
+\b RE Python Scan - aggiornamento roadmap 2026-07-12\b0\par
+\par
+\b Collocazione del progetto\b0\par
+La sede canonica del progetto e REConsole. La copia presente in RE-Workbench e una copia di lavoro/staging e non deve diventare una seconda origine del codice.\par
+\par
+\b Fase 6A - compatibilita ADB\b0\par
+Il programma deve funzionare sia in Windows sia in WSL. La risoluzione di adb segue questo ordine:\par
+1. variabile d'ambiente ADB_PATH;\par
+2. adb.exe accanto al programma;\par
+3. /mnt/e/platform-tools/adb.exe in WSL;\par
+4. E:\\platform-tools\\adb.exe in Windows;\par
+5. adb presente nel PATH.\par
+\par
+\b Fase 6B - logger Wi-Fi mirato\b0\par
+Il comando START avvia ADB/logcat e Wi-Fi senza modificare la GUI.\par
+Il logger Wi-Fi deve conservare:\par
+- indirizzo wlan0 e route;\par
+- SSID e BSSID;\par
+- RSSI, frequenza e link speed;\par
+- ultimo evento RSSI utile.\par
+Non deve riversare a ogni ciclo l'intera cronologia di dumpsys wifi. Il raw conserva l'uscita diagnostica selezionata; il clean elimina solo duplicazioni certe.\par
+\par
+\b Fase 6C - correlazione minima\b0\par
+La correlazione usa il prefisso temporale comune dei log e mette in relazione:\par
+- apertura sessione TNP/P2P/Relay;\par
+- receive avframe;\par
+- audio input/output;\par
+- RSSI e stato wlan0.\par
+Non vengono ancora introdotti tshark, Ethernet manager, confidence score o modifiche grafiche.\par
+\par
+\b Fase 6D - decisione tecnica\b0\par
+Se la correlazione non produce informazioni sufficienti sul trasporto media, si sospende il percorso Wi-Fi e si ritorna allo studio di anyka_ipc in Debug mode.\par
+}

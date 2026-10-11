@@ -1,25 +1,55 @@
-# Yi Reverse Console v1.03
+# RE Console v1.03
 
-Un tool grafico per analisi avanzate di log Android via ADB, con filtro runtime, tagging protocollo, e salvataggio automatico.
+Tool grafico per acquisizione e correlazione di log Android via ADB, con
+filtraggio runtime, catalogo pattern e snapshot Wi-Fi sincronizzati.
 
 ## Requisiti
 
-- Python 3.8+
-- adb.exe nella stessa cartella
-- PySide6 (`pip install -r requirements.txt`)
+- Python 3
+- PySide6
+- ADB disponibile tramite una delle seguenti modalita':
+  - variabile `ADB_PATH`;
+  - `/mnt/e/platform-tools/adb.exe` in WSL;
+  - `adb` o `adb.exe` nel `PATH`;
+  - `adb.exe` nella directory del progetto.
 
-## Uso
+Installazione dipendenze:
 
-1. Avvia un emulatore Android o collega un dispositivo in Developer mode enabled
-2. Avvia questo script
-3. Clicca "SCAN APPS", seleziona un'app e poi "START"
+```sh
+python3 -m pip install -r requirements.txt
+```
 
-## File
-- `log_console_v_1_03.py`: applicazione principale
-- `filters.txt`: filtri attivi (modificabile anche a runtime)
-- `logs/`: log raw e puliti
+## Avvio
 
-## ROADMAP
-![Roadmap finale](Roadmap.png)
+Dopo l'installazione del launcher globale:
 
-*Bruno*
+```sh
+re-console
+```
+
+Oppure dalla directory del progetto:
+
+```sh
+./re-console
+```
+
+I percorsi di configurazione e dei log sono risolti rispetto alla directory
+del progetto, quindi il comando puo' essere lanciato da qualsiasi posizione.
+
+## Struttura
+
+- `log_console_v_1_03.py`: applicazione principale.
+- `core/`: gestione ADB, Wi-Fi, filtri, dispositivi e runtime.
+- `filters.txt`: filtri attivi.
+- `filters_candidates.txt`: catalogo dei pattern candidati.
+- `devices.json`: registro locale dei dispositivi.
+- `logs/`: log raw, clean e archivi selezionati.
+- `notes/`: roadmap e note di progetto.
+
+## Roadmap
+
+La roadmap storica e i successivi addendum sono conservati in `notes/`.
+L'obiettivo resta una console generale per correlare ADB, Wi-Fi, Ethernet e,
+in seguito, BLE su una timeline comune.
+
+By Bruno
