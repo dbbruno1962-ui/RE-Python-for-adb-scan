@@ -234,3 +234,23 @@ incompleta ed è corretta da questa procedura.
 - Dipendenze Python/ADB documentate installate e verificabili; funzionamento
   headless Qt confermato. L'esecuzione interattiva dipende ancora dalla
   disponibilità del display al processo e da un target ADB autorizzato.
+
+## Sessione 2026-11-22 — pubblicazione GitHub
+
+### Azione eseguita
+
+- Pubblicati su `dbbruno1962-ui/RE-Python-for-adb-scan`, branch `main`, le
+  linee guida, i README aggiornati, l'indice e i nove record Hypertext, il
+  journal con mirror e `analyze_vidure.sh` corretto. Commit:
+  `388c4efe7fb509e4adc8ecd406cda9347f7d3daa`.
+- Aggiunto `vidure_re_output/` a `.gitignore`. I 664 MB di APK/estrazioni e
+  la guida locale con identificatori operativi sono rimasti esclusi.
+- Verificati su GitHub il nuovo head del branch, `hypertext/index.md` e lo
+  script corretto. Il push è stato fast-forward dal commit precedente
+  `91939b06f2bf02047ca74345edbaf4edfa7f5551`.
+
+### Limite
+
+- Non sono stati pubblicati i cambi locali preesistenti di soli permessi su
+  `devices.json`, `notes/Roadmap.rtf`, `re-console` e
+  `scripts/capture_yi_sd_logcat.sh`.
