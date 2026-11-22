@@ -15,6 +15,19 @@ runtime filtering, a pattern catalog, and synchronized Wi-Fi snapshots.
   - `adb` or `adb.exe` in `PATH`;
   - `adb.exe` in the project directory.
 
+## Debian 13 with GNOME
+
+Install ADB, the system PySide6 modules, and the Qt Wayland platform plugin:
+
+```sh
+sudo apt update
+sudo apt install adb python3-pyside6.qtwidgets qt6-wayland libxcb-cursor0
+```
+
+The `python3-pyside6.qtwidgets` package also installs the QtCore and QtGui
+modules required by the application. `libxcb-cursor0` supports the XWayland
+backend. On other distributions, install the equivalent packages.
+
 Install dependencies:
 
 ```sh
