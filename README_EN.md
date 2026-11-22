@@ -94,13 +94,6 @@ needed.
 - `logs/`: local capture output, excluded from version control.
 - `examples/`: synthetic, sanitized examples of log formats.
 - `notes/`: roadmap and project notes.
-- `AGENTS.md` and `.agent-rules/`: worktree Operator/Curator guidance.
-- `hypertext/`: semantic index, records, and Builder/Curator instructions;
-  initial coverage is partial and records state their limits.
-- `reports/status.md`: append-only journal; `reports/mirror/status.md` is its
-  byte-identical checkpoint for verifying appended history.
-- `analyze_vidure.sh`: Viidure APK extraction and static string filters;
-  local APKs and outputs under `vidure_re_output/` are not versioned.
 
 ## Log privacy
 

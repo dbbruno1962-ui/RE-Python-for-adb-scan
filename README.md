@@ -93,13 +93,6 @@ ADB su TCP/IP non cifra ne' autentica nuovamente ogni connessione sulla porta
 - `logs/`: output locale delle catture, escluso dal controllo di versione.
 - `examples/`: campioni sintetici e bonificati del formato dei log.
 - `notes/`: roadmap e note di progetto.
-- `AGENTS.md` e `.agent-rules/`: linee guida Operator/Curator del worktree.
-- `hypertext/`: indice semantico, record e istruzioni Builder/Curator; la
-  copertura iniziale è parziale e i record ne indicano i limiti.
-- `reports/status.md`: journal append-only; `reports/mirror/status.md` ne è
-  il checkpoint byte-identico per verificare gli append.
-- `analyze_vidure.sh`: estrazione e filtri statici per l'APK Viidure; gli
-  APK e gli output locali in `vidure_re_output/` non vengono versionati.
 
 ## Privacy dei log
 
